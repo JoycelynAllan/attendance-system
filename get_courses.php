@@ -29,11 +29,16 @@ try {
         $stmt = $conn->prepare("
             SELECT c.course_id, c.course_code, c.course_name, c.description, 
                    c.credit_hours, c.semester,
+                   u_faculty.first_name as faculty_first_name,
+                   u_faculty.last_name as faculty_last_name,
+                   u_faculty.email as faculty_email,
                    u_intern.first_name as intern_first_name,
                    u_intern.last_name as intern_last_name,
+                   u_intern.email as intern_email,
                    COUNT(CASE WHEN e.status = 'approved' THEN 1 END) as enrolled_count
             FROM courses c
             LEFT JOIN Enrollment e ON c.course_id = e.course_id
+            INNER JOIN users u_faculty ON c.faculty_id = u_faculty.user_id
             LEFT JOIN users u_intern ON c.intern_id = u_intern.user_id
             WHERE c.faculty_id = ?
             GROUP BY c.course_id
@@ -54,8 +59,10 @@ try {
                        c.credit_hours, c.semester,
                        u_faculty.first_name as faculty_first_name, 
                        u_faculty.last_name as faculty_last_name,
+                       u_faculty.email as faculty_email,
                        u_intern.first_name as intern_first_name,
                        u_intern.last_name as intern_last_name,
+                       u_intern.email as intern_email,
                        e.requested_at
                 FROM Enrollment e
                 INNER JOIN courses c ON e.course_id = c.course_id
@@ -70,16 +77,18 @@ try {
             error_log("Found " . count($courses) . " enrolled courses");
             
         } elseif ($type === 'pending') {
-            // Student: Get pending enrollment requests
+            // Student: Get pending enrollment requests (ONLY pending, not approved or rejected)
             error_log("Fetching pending courses for student: $user_id");
             
             $stmt = $conn->prepare("
                 SELECT c.course_id, c.course_code, c.course_name, c.description,
                        u_faculty.first_name as faculty_first_name, 
                        u_faculty.last_name as faculty_last_name,
+                       u_faculty.email as faculty_email,
                        u_intern.first_name as intern_first_name,
                        u_intern.last_name as intern_last_name,
-                       e.enrollment_type, e.requested_at
+                       u_intern.email as intern_email,
+                       e.enrollment_type, e.requested_at, e.status
                 FROM Enrollment e
                 INNER JOIN courses c ON e.course_id = c.course_id
                 INNER JOIN users u_faculty ON c.faculty_id = u_faculty.user_id
@@ -90,7 +99,7 @@ try {
             $stmt->execute([$user_id]);
             $courses = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
-            error_log("Found " . count($courses) . " pending courses");
+            error_log("Found " . count($courses) . " pending courses (status='pending' only)");
             
         } else {
             // Student: Get available courses (not enrolled or pending)
@@ -123,13 +132,15 @@ try {
         // Faculty Intern: Get all courses with indication if they're assigned
         error_log("Fetching all courses for faculty intern");
         
-        $stmt = $conn->prepare("
-            SELECT c.course_id, c.course_code, c.course_name, c.description,
+            $stmt = $conn->prepare("
+                SELECT c.course_id, c.course_code, c.course_name, c.description,
                    c.credit_hours, c.semester,
                    u_faculty.first_name as faculty_first_name, 
                    u_faculty.last_name as faculty_last_name,
+                   u_faculty.email as faculty_email,
                    u_intern.first_name as intern_first_name,
                    u_intern.last_name as intern_last_name,
+                   u_intern.email as intern_email,
                    c.intern_id,
                    (c.intern_id = ?) as is_my_course,
                    COUNT(CASE WHEN e.status = 'approved' THEN 1 END) as enrolled_count

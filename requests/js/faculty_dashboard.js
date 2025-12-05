@@ -8,6 +8,10 @@ document.addEventListener('DOMContentLoaded', function () {
     loadMyCourses();
     loadEnrollmentRequests();
     setupModals();
+    // Initialize sessions section on page load
+    setTimeout(() => {
+        initializeSessions();
+    }, 500);
 });
 
 function setupNavigation() {
@@ -74,7 +78,7 @@ async function loadMyCourses() {
                 }
 
                 return `
-                    <div class="course-item">
+                    <div class="course-item" style="cursor: pointer;" onclick="viewCourseStudents(${course.course_id}, '${esc(course.course_code)}', '${esc(course.course_name)}')">
                         <h4>${esc(course.course_code)} - ${esc(course.course_name)}</h4>
                         <p>${esc(course.description || 'No description')}</p>
                         <div class="course-meta">
@@ -82,6 +86,9 @@ async function loadMyCourses() {
                             <small><strong>Enrolled Students:</strong> ${course.enrolled_count || 0}</small>
                             ${course.semester ? `<small><strong>Semester:</strong> ${esc(course.semester)}</small>` : ''}
                             ${internInfo}
+                        </div>
+                        <div style="margin-top: 10px; font-size: 12px; color: #722f37;">
+                            <em>Click to view enrolled students and attendance</em>
                         </div>
                     </div>
                 `;
@@ -171,10 +178,40 @@ async function initializeSessions() {
                 courseSelect.appendChild(option);
             });
             
-            courseSelect.addEventListener('change', function() {
+            // Remove existing listeners and add new one
+            const newSelect = courseSelect.cloneNode(true);
+            courseSelect.parentNode.replaceChild(newSelect, courseSelect);
+            
+            newSelect.addEventListener('change', function() {
                 const courseId = this.value;
+                console.log('Course selected:', courseId);
+                
                 if (courseId) {
-                    loadSessions(courseId);
+                    const selectedOption = this.options[this.selectedIndex];
+                    const courseCode = selectedOption.textContent.split(' - ')[0];
+                    const courseName = selectedOption.textContent.split(' - ')[1];
+                    
+                    console.log('Setting up session management for:', courseCode, courseName);
+                    
+                    // Show create button immediately
+                    container.innerHTML = `
+                        <div style="margin-bottom: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                            <button class="btn btn-primary" onclick="createSession(${courseId}, '${esc(courseCode)}', '${esc(courseName)}')">
+                                Create New Session
+                            </button>
+                            <button class="btn btn-secondary" onclick="viewCourseStudents(${courseId}, '${esc(courseCode)}', '${esc(courseName)}')">
+                                View Enrolled Students
+                            </button>
+                        </div>
+                        <div id="sessionsListContainer">
+                            <p class="loading">Loading sessions...</p>
+                        </div>
+                    `;
+                    
+                    // Load sessions
+                    setTimeout(() => {
+                        loadSessionsForCourse(courseId);
+                    }, 100);
                 } else {
                     container.innerHTML = '<p>Select a course to view and manage sessions.</p>';
                 }
@@ -187,97 +224,216 @@ async function initializeSessions() {
     }
 }
 
-async function loadSessions(courseId) {
-    const container = document.getElementById('sessionList');
-    if (!container) return;
+// Load sessions for a course (renamed to avoid conflict with session_management.js)
+async function loadSessionsForCourse(courseId) {
+    const sessionsContainer = document.getElementById('sessionsListContainer');
+    if (!sessionsContainer) {
+        console.error('sessionsListContainer not found');
+        return;
+    }
     
-    container.innerHTML = '<p class="loading">Loading sessions...</p>';
+    sessionsContainer.innerHTML = '<p class="loading">Loading sessions...</p>';
     
     try {
         const response = await fetch(`get_sessions.php?course_id=${courseId}`);
         const data = await response.json();
         
-        if (data.success && data.sessions && data.sessions.length > 0) {
-            const courseSelect = document.getElementById('sessionCourseSelect');
-            const selectedOption = courseSelect.options[courseSelect.selectedIndex];
-            const courseCode = selectedOption.textContent.split(' - ')[0];
-            const courseName = selectedOption.textContent.split(' - ')[1];
-            
-            container.innerHTML = `
-                <div style="margin-bottom: 15px;">
-                    <button class="btn btn-primary" onclick="createSession(${courseId}, '${esc(courseCode)}', '${esc(courseName)}')">
-                        Create New Session
-                    </button>
-                </div>
-                <div id="sessionsListContainer"></div>
-            `;
-            
-            // Load sessions using session_management.js function
-            if (typeof loadSessions === 'function' && window.loadSessions !== loadSessions) {
-                // Use the session_management.js version
-                const sessionsContainer = document.getElementById('sessionsListContainer');
-                sessionsContainer.innerHTML = data.sessions.map(session => {
-                    const sessionDate = new Date(session.date);
-                    const formattedDate = sessionDate.toLocaleDateString('en-US', { 
-                        weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' 
-                    });
-                    
-                    const codeDisplay = session.attendance_code 
-                        ? `<div style="margin-top: 10px;">
-                             <strong>Attendance Code:</strong> 
-                             <code style="font-size: 16px; padding: 5px 10px; background: #f4f4f4; border-radius: 5px;">${session.attendance_code}</code>
-                           </div>`
-                        : '';
-                    
-                    return `
-                        <div class="course-item">
-                            <h4>${formattedDate} - ${session.start_time} to ${session.end_time}</h4>
-                            ${session.topic ? `<p><strong>Topic:</strong> ${esc(session.topic)}</p>` : ''}
-                            ${session.location ? `<p><strong>Location:</strong> ${esc(session.location)}</p>` : ''}
-                            <div class="course-meta">
-                                <small><strong>Course:</strong> ${esc(session.course_code)} - ${esc(session.course_name)}</small>
-                                <small><strong>Attendance Count:</strong> ${session.attendance_count || 0}</small>
-                            </div>
-                            ${codeDisplay}
-                            <div style="margin-top: 10px;">
-                                <button class="btn btn-sm btn-primary mark-attendance-btn" 
-                                        data-session-id="${session.session_id}" 
-                                        data-course-id="${session.course_id}">
-                                    Mark Attendance
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-                
-                // Attach event listeners
-                document.querySelectorAll('.mark-attendance-btn').forEach(btn => {
-                    btn.addEventListener('click', function() {
-                        const sessionId = this.getAttribute('data-session-id');
-                        const courseId = this.getAttribute('data-course-id');
-                        if (typeof openMarkAttendanceModal === 'function') {
-                            openMarkAttendanceModal(sessionId, courseId);
-                        }
-                    });
+        if (!data.success) {
+            sessionsContainer.innerHTML = `<p style="color: red;">Error: ${data.message || 'Failed to load sessions'}</p>`;
+            return;
+        }
+        
+        if (data.sessions && data.sessions.length > 0) {
+            sessionsContainer.innerHTML = data.sessions.map(session => {
+                const sessionDate = new Date(session.date);
+                const formattedDate = sessionDate.toLocaleDateString('en-US', { 
+                    weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' 
                 });
-            }
-        } else {
-            const courseSelect = document.getElementById('sessionCourseSelect');
-            const selectedOption = courseSelect.options[courseSelect.selectedIndex];
-            const courseCode = selectedOption.textContent.split(' - ')[0];
-            const courseName = selectedOption.textContent.split(' - ')[1];
+                
+                const codeDisplay = session.attendance_code 
+                    ? `<div style="margin-top: 10px;">
+                         <strong>Attendance Code:</strong> 
+                         <code style="font-size: 16px; padding: 5px 10px; background: #f4f4f4; border-radius: 5px;">${session.attendance_code}</code>
+                       </div>`
+                    : '';
+                
+                return `
+                    <div class="course-item" style="margin-bottom: 15px;">
+                        <h4>${formattedDate} - ${session.start_time} to ${session.end_time}</h4>
+                        ${session.topic ? `<p><strong>Topic:</strong> ${esc(session.topic)}</p>` : ''}
+                        ${session.location ? `<p><strong>Location:</strong> ${esc(session.location)}</p>` : ''}
+                        <div class="course-meta">
+                            <small><strong>Course:</strong> ${esc(session.course_code)} - ${esc(session.course_name)}</small>
+                            <small><strong>Attendance Count:</strong> ${session.attendance_count || 0}</small>
+                        </div>
+                        ${codeDisplay}
+                        <div style="margin-top: 10px;">
+                            <button class="btn btn-sm btn-primary mark-attendance-btn" 
+                                    data-session-id="${session.session_id}" 
+                                    data-course-id="${session.course_id}">
+                                Mark Attendance
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
             
-            container.innerHTML = `
-                <div style="margin-bottom: 15px;">
-                    <button class="btn btn-primary" onclick="createSession(${courseId}, '${esc(courseCode)}', '${esc(courseName)}')">
-                        Create New Session
-                    </button>
-                </div>
-                <p>No sessions created yet. Create your first session!</p>
-            `;
+            // Attach event listeners
+            document.querySelectorAll('.mark-attendance-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const sessionId = this.getAttribute('data-session-id');
+                    const courseId = this.getAttribute('data-course-id');
+                    if (typeof openMarkAttendanceModal === 'function') {
+                        openMarkAttendanceModal(sessionId, courseId);
+                    }
+                });
+            });
+        } else {
+            sessionsContainer.innerHTML = '<p>No sessions created yet. Create your first session using the button above!</p>';
         }
     } catch (error) {
-        container.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+        console.error('Error loading sessions:', error);
+        sessionsContainer.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+    }
+}
+
+// View enrolled students with attendance status
+async function viewCourseStudents(courseId, courseCode, courseName) {
+    try {
+        // Get course details (for faculty and intern info)
+        const courseResponse = await fetch('get_courses.php');
+        const courseData = await courseResponse.json();
+        const course = courseData.courses ? courseData.courses.find(c => c.course_id == courseId) : null;
+        
+        // Get enrolled students (only students, not faculty/intern)
+        const studentsResponse = await fetch(`get_enrolled_students.php?course_id=${courseId}`);
+        const studentsData = await studentsResponse.json();
+        
+        // Get all sessions for this course
+        const sessionsResponse = await fetch(`get_sessions.php?course_id=${courseId}`);
+        const sessionsData = await sessionsResponse.json();
+        
+        // Get attendance for all students
+        const attendanceData = {};
+        if (sessionsData.success && sessionsData.sessions) {
+            for (const session of sessionsData.sessions) {
+                const attResponse = await fetch(`get_session_attendance.php?session_id=${session.session_id}`);
+                const attData = await attResponse.json();
+                if (attData.success && attData.attendance) {
+                    attData.attendance.forEach(att => {
+                        if (!attendanceData[att.student_id]) {
+                            attendanceData[att.student_id] = [];
+                        }
+                        attendanceData[att.student_id].push({
+                            session_date: session.date,
+                            status: att.status
+                        });
+                    });
+                }
+            }
+        }
+        
+        // Build faculty and intern info section
+        let facultyInfo = '';
+        let internInfo = '';
+        
+        if (course) {
+            if (course.faculty_first_name && course.faculty_last_name) {
+                facultyInfo = `
+                    <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin-bottom: 15px; border-left: 4px solid #722f37;">
+                        <h4 style="margin: 0 0 10px 0; color: #722f37;">Faculty</h4>
+                        <p style="margin: 5px 0;"><strong>Name:</strong> ${esc(course.faculty_first_name)} ${esc(course.faculty_last_name)}</p>
+                        <p style="margin: 5px 0;"><strong>Email:</strong> ${esc(course.faculty_email || 'N/A')}</p>
+                    </div>
+                `;
+            }
+            
+            if (course.intern_first_name && course.intern_last_name) {
+                internInfo = `
+                    <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin-bottom: 15px; border-left: 4px solid #28a745;">
+                        <h4 style="margin: 0 0 10px 0; color: #28a745;">Faculty Intern</h4>
+                        <p style="margin: 5px 0;"><strong>Name:</strong> ${esc(course.intern_first_name)} ${esc(course.intern_last_name)}</p>
+                        <p style="margin: 5px 0;"><strong>Email:</strong> ${esc(course.intern_email || 'N/A')}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        // Build student list with attendance (only actual students)
+        let studentList = '';
+        if (studentsData.success && studentsData.students && studentsData.students.length > 0) {
+            studentList = studentsData.students.map(student => {
+                const studentAttendance = attendanceData[student.user_id] || [];
+                const presentCount = studentAttendance.filter(a => a.status === 'present').length;
+                const lateCount = studentAttendance.filter(a => a.status === 'late').length;
+                const absentCount = studentAttendance.filter(a => a.status === 'absent').length;
+                const totalSessions = sessionsData.sessions ? sessionsData.sessions.length : 0;
+                const attendancePercentage = totalSessions > 0 ? Math.round((presentCount / totalSessions) * 100) : 0;
+                
+                return `
+                    <div style="border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; border-radius: 5px;">
+                        <div style="display: flex; justify-content: space-between; align-items: start;">
+                            <div>
+                                <h4 style="margin: 0 0 5px 0;">${esc(student.first_name)} ${esc(student.last_name)}</h4>
+                                <p style="margin: 0; color: #666; font-size: 14px;">${esc(student.email)}</p>
+                                <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">Username: ${esc(student.username)}</p>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 24px; font-weight: bold; color: ${attendancePercentage >= 80 ? 'green' : attendancePercentage >= 60 ? 'orange' : 'red'};">
+                                    ${attendancePercentage}%
+                                </div>
+                                <div style="font-size: 12px; color: #666;">Attendance</div>
+                            </div>
+                        </div>
+                        <div style="margin-top: 10px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center;">
+                            <div>
+                                <div style="font-weight: bold; color: green;">${presentCount}</div>
+                                <div style="font-size: 12px; color: #666;">Present</div>
+                            </div>
+                            <div>
+                                <div style="font-weight: bold; color: orange;">${lateCount}</div>
+                                <div style="font-size: 12px; color: #666;">Late</div>
+                            </div>
+                            <div>
+                                <div style="font-weight: bold; color: red;">${absentCount}</div>
+                                <div style="font-size: 12px; color: #666;">Absent</div>
+                            </div>
+                            <div>
+                                <div style="font-weight: bold;">${totalSessions}</div>
+                                <div style="font-size: 12px; color: #666;">Total</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        } else {
+            studentList = '<p style="text-align: center; color: #666; padding: 20px;">No enrolled students found for this course.</p>';
+        }
+        
+        await Swal.fire({
+            title: `Course Details - ${esc(courseCode)}`,
+            html: `
+                <div style="max-height: 600px; overflow-y: auto; text-align: left;">
+                    ${facultyInfo}
+                    ${internInfo}
+                    <div style="margin-top: 20px;">
+                        <h4 style="margin: 0 0 15px 0; color: #722f37;">Enrolled Students</h4>
+                        ${studentList}
+                    </div>
+                </div>
+            `,
+            width: '750px',
+            confirmButtonText: 'Close',
+            confirmButtonColor: '#722f37'
+        });
+        
+    } catch (error) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: error.message,
+            confirmButtonColor: '#722f37'
+        });
     }
 }
 
@@ -362,9 +518,13 @@ async function handleEnrollmentAction(enrollmentId, action) {
                 text: data.message,
                 timer: 2000
             });
-
+            
+            // Reload enrollment requests
             await loadEnrollmentRequests();
             await loadMyCourses();
+            
+            // Note: The student's pending requests will update when they refresh or navigate to that section
+            // The query already filters by status='pending', so approved requests won't show
         } else {
             Swal.fire({
                 icon: 'error',
@@ -393,3 +553,6 @@ function esc(text) {
     };
     return text.toString().replace(/[&<>"']/g, m => map[m]);
 }
+
+// Make functions globally accessible
+window.viewCourseStudents = viewCourseStudents;

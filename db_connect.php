@@ -13,14 +13,23 @@ function loadEnv($path) {
     
     $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     foreach ($lines as $line) {
-        if (strpos(trim($line), '#') === 0) {
+        $line = trim($line);
+        
+        // Skip comments and empty lines
+        if (empty($line) || strpos($line, '#') === 0) {
+            continue;
+        }
+        
+        // Split by first = only
+        if (strpos($line, '=') === false) {
             continue;
         }
         
         list($name, $value) = explode('=', $line, 2);
         $name = trim($name);
-        $value = trim($value);
+        $value = trim($value); // This will be empty string if DB_PASS= with nothing after
         
+        // Set environment variable (empty string is valid for password)
         if (!array_key_exists($name, $_ENV)) {
             putenv(sprintf('%s=%s', $name, $value));
             $_ENV[$name] = $value;
@@ -37,7 +46,11 @@ $host = getenv('DB_HOST') ?: 'localhost';
 $port = getenv('DB_PORT') ?: '3306';
 $dbname = getenv('DB_NAME') ?: 'attendancemanagement';
 $username = getenv('DB_USER') ?: 'root';
-$password = getenv('DB_PASS') ?: '';
+$password = getenv('DB_PASS');
+// Handle empty password - if DB_PASS is not set or is empty string, use empty password
+if ($password === false || $password === '') {
+    $password = '';
+}
 
 try {
     // Create PDO connection with port support for remote servers
@@ -57,26 +70,41 @@ try {
     error_log("Database Connection Error: " . $e->getMessage());
     error_log("Connection details - Host: $host, Port: $port, Database: $dbname, User: $username");
     
-    // Output detailed error for debugging
-    // Always show error details to help with configuration
-    $errorDetails = [
-        'success' => false,
-        'message' => 'Database connection failed. Please check your configuration.',
-        'error' => $e->getMessage(),
-        'host' => $host,
-        'port' => $port,
-        'database' => $dbname,
-        'user' => $username,
-        'help' => 'Create a .env file with correct database credentials. Visit db_config_helper.php for assistance.'
-    ];
+    // Check if this is an AJAX/API request (JSON expected)
+    $isAjaxRequest = (
+        !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
+        strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest'
+    ) || (
+        !empty($_SERVER['CONTENT_TYPE']) && 
+        strpos($_SERVER['CONTENT_TYPE'], 'application/json') !== false
+    ) || (
+        !empty($_SERVER['HTTP_ACCEPT']) && 
+        strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false
+    );
     
-    // If this is an AJAX request, return JSON
-    if (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) == 'xmlhttprequest') {
+    // Always return JSON for API endpoints (signup.php, login.php, etc.)
+    $isApiEndpoint = in_array(basename($_SERVER['PHP_SELF']), [
+        'signup.php', 'login.php', 'create_course.php', 'get_courses.php',
+        'join_course.php', 'manage_enrollment.php', 'create_session.php',
+        'get_sessions.php', 'mark_attendance.php', 'check_in_code.php',
+        'get_attendance_report.php', 'get_enrolled_students.php'
+    ]);
+    
+    if ($isAjaxRequest || $isApiEndpoint) {
         header('Content-Type: application/json');
-        die(json_encode($errorDetails));
+        die(json_encode([
+            'success' => false,
+            'message' => 'Database connection failed. Please check your configuration.',
+            'error' => $e->getMessage(),
+            'host' => $host,
+            'port' => $port,
+            'database' => $dbname,
+            'user' => $username,
+            'help' => 'Create a .env file with correct database credentials. Visit db_config_helper.php for assistance.'
+        ]));
     }
     
-    // Otherwise, show HTML error page
+    // Otherwise, show HTML error page for direct browser access
     die("
     <!DOCTYPE html>
     <html>

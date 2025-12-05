@@ -7,6 +7,15 @@ document.addEventListener('DOMContentLoaded', function () {
     setupNavigation();
     loadEnrolledCourses();
     setupJoinModal();
+    
+    // Auto-refresh pending requests every 30 seconds when that section is active
+    setInterval(() => {
+        const pendingSection = document.getElementById('pending-section');
+        if (pendingSection && pendingSection.classList.contains('active')) {
+            console.log('Auto-refreshing pending requests...');
+            loadPendingRequests();
+        }
+    }, 30000); // Refresh every 30 seconds
 });
 
 function setupNavigation() {
@@ -33,7 +42,11 @@ function setupNavigation() {
             switch (sectionName) {
                 case 'courses': loadEnrolledCourses(); break;
                 case 'available': loadAvailableCourses(); break;
-                case 'pending': loadPendingRequests(); break;
+                case 'pending': 
+                    loadPendingRequests(); 
+                    // Also refresh enrolled courses in case a request was just approved
+                    setTimeout(() => loadEnrolledCourses(), 500);
+                    break;
                 case 'schedule': loadSchedule(); break;
                 case 'grades': loadGrades(); break;
             }
@@ -475,6 +488,10 @@ async function handleJoinSubmit(e) {
             console.log('  Reloading available courses and pending requests...');
             await loadAvailableCourses();
             await loadPendingRequests();
+            // Also refresh enrolled courses in case this was just approved
+            setTimeout(() => loadEnrolledCourses(), 500);
+            // Also refresh enrolled courses in case this was just approved
+            setTimeout(() => loadEnrolledCourses(), 500);
 
         } else {
             console.error('  FAILED:', data.message);
