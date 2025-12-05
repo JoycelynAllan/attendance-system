@@ -75,16 +75,13 @@ $last_name = $_SESSION['last_name'];
         <section id="sessions-section" class="dashboard-section">
             <div class="card">
                 <header class="card-header">
-                    <h3>Session Overview</h3>
+                    <h3>Session Management</h3>
+                    <select id="sessionCourseSelect" class="btn btn-sm btn-secondary" style="margin-left: 10px;">
+                        <option value="">Select a course...</option>
+                    </select>
                 </header>
                 <div id="sessionList">
-                    <p>Session management features coming soon. You will be able to:</p>
-                    <ul style="text-align: left; margin: 20px auto; max-width: 500px;">
-                        <li>Create and schedule class sessions</li>
-                        <li>View session attendance records</li>
-                        <li>Manage session details and notes</li>
-                        <li>Track student participation</li>
-                    </ul>
+                    <p>Select a course to view and manage sessions.</p>
                 </div>
             </div>
         </section>
@@ -154,6 +151,7 @@ $last_name = $_SESSION['last_name'];
     
     <script src="requests/js/logout.js"></script>
     <script src="requests/js/faculty_dashboard.js"></script>
+    <script src="requests/js/session_management.js"></script>
     <script>
     // Report generation functions
     function generateAttendanceReport() {

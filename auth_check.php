@@ -6,9 +6,10 @@ session_start();
 // Check if user is logged in
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['username'])) {
     // User is not logged in, redirect to login page
-    header('Location: login.php');
+    header('Location: login.html');
     exit;
 }
+
 
 // Optional: Check session timeout (30 minutes)
 $timeout_duration = 1800; // 30 minutes in seconds
@@ -17,7 +18,7 @@ if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity']) >
     // Session expired
     session_unset();
     session_destroy();
-    header('Location: login.php?timeout=1');
+    header('Location: login.html?timeout=1');
     exit;
 }
 

@@ -86,33 +86,36 @@ $last_name = $_SESSION['last_name'];
             </div>
         </section>
         
-        <!-- Session Schedule Section -->
+        <!-- Attendance Check-In Section -->
         <section id="schedule-section" class="dashboard-section">
             <div class="card">
                 <header class="card-header">
-                    <h3>Upcoming Sessions</h3>
+                    <h3>Check In with Code</h3>
                 </header>
-                <div id="sessionSchedule">
-                    <p class="loading">Loading schedule...</p>
+                <div id="checkInSection">
+                    <p>Use the attendance code provided by your instructor to check in for a session.</p>
+                    <button class="btn btn-primary" onclick="checkInWithCode()" style="margin-top: 15px;">
+                        Check In with Code
+                    </button>
                 </div>
             </div>
         </section>
         
-        <!-- Grades & Reports Section -->
+        <!-- Attendance Reports Section -->
         <section id="grades-section" class="dashboard-section">
-            <div class="dashboard-grid">
-                <div class="card">
-                    <h3>My Grades</h3>
-                    <div id="gradesList">
-                        <p class="loading">Loading grades...</p>
+            <div class="card">
+                <header class="card-header">
+                    <h3>Attendance Reports</h3>
+                    <select id="attendanceCourseSelect" class="btn btn-sm btn-secondary" style="margin-left: 10px;">
+                        <option value="">Select a course...</option>
+                    </select>
+                    <div style="margin-left: 10px; display: inline-block;">
+                        <button class="btn btn-sm btn-primary" onclick="loadAttendanceReport('overall')">Overall</button>
+                        <button class="btn btn-sm btn-secondary" onclick="loadAttendanceReport('daily')">Today</button>
                     </div>
-                </div>
-                
-                <div class="card">
-                    <h3>Feedback & Reports</h3>
-                    <div id="feedbackList">
-                        <p class="loading">Loading feedback...</p>
-                    </div>
+                </header>
+                <div id="attendanceReports">
+                    <p>Select a course to view attendance reports.</p>
                 </div>
             </div>
         </section>
@@ -165,5 +168,59 @@ $last_name = $_SESSION['last_name'];
     
     <script src="requests/js/logout.js"></script>
     <script src="requests/js/student_dashboard.js"></script>
+    <script src="requests/js/student_attendance.js"></script>
+    <script>
+    // Initialize attendance reports
+    async function initializeAttendanceReports() {
+        const courseSelect = document.getElementById('attendanceCourseSelect');
+        
+        try {
+            const response = await fetch('get_courses.php?type=enrolled');
+            const data = await response.json();
+            
+            if (data.success && data.courses && data.courses.length > 0) {
+                courseSelect.innerHTML = '<option value="">Select a course...</option>';
+                data.courses.forEach(course => {
+                    const option = document.createElement('option');
+                    option.value = course.course_id;
+                    option.textContent = `${course.course_code} - ${course.course_name}`;
+                    courseSelect.appendChild(option);
+                });
+                
+                courseSelect.addEventListener('change', function() {
+                    const courseId = this.value;
+                    if (courseId) {
+                        window.currentAttendanceCourseId = courseId;
+                        loadAttendanceReport('overall');
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Error loading courses:', error);
+        }
+    }
+    
+    function loadAttendanceReport(type) {
+        const courseId = window.currentAttendanceCourseId || document.getElementById('attendanceCourseSelect').value;
+        if (!courseId) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Select Course',
+                text: 'Please select a course first',
+                confirmButtonColor: '#722f37'
+            });
+            return;
+        }
+        
+        if (typeof loadAttendanceReports === 'function') {
+            loadAttendanceReports(courseId, type);
+        }
+    }
+    
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        initializeAttendanceReports();
+    });
+    </script>
 </body>
 </html>

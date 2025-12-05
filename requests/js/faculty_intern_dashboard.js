@@ -46,7 +46,7 @@ function setupNavigation() {
             // Load data
             switch(section) {
                 case 'courses': loadCourses(); break;
-                case 'sessions': loadSessions(); break;
+                case 'sessions': initializeSessions(); break;
                 case 'reports': loadReports(); break;
             }
         });
@@ -209,22 +209,133 @@ async function joinCourse(courseId, courseCode) {
     }
 }
 
-function loadSessions() {
-    console.log('>>> loadSessions() called');
+// Initialize sessions section
+async function initializeSessions() {
     const container = document.getElementById('sessionList');
-    if (!container) {
-        console.error('ERROR: sessionList not found');
-        return;
-    }
+    const courseSelect = document.getElementById('sessionCourseSelect');
     
-    container.innerHTML = `
-        <p>Sessions feature coming soon. You will be able to:</p>
-        <ul>
-            <li>View all course sessions</li>
-            <li>Mark student attendance</li>
-            <li>View session details</li>
-        </ul>
-    `;
+    if (!container) return;
+    
+    // Load courses for dropdown
+    try {
+        const response = await fetch('get_courses.php');
+        const data = await response.json();
+        
+        if (data.success && data.courses && data.courses.length > 0) {
+            courseSelect.innerHTML = '<option value="">Select a course...</option>';
+            data.courses.forEach(course => {
+                if (course.is_my_course == 1) {
+                    const option = document.createElement('option');
+                    option.value = course.course_id;
+                    option.textContent = `${course.course_code} - ${course.course_name}`;
+                    courseSelect.appendChild(option);
+                }
+            });
+            
+            courseSelect.addEventListener('change', function() {
+                const courseId = this.value;
+                if (courseId) {
+                    loadSessions(courseId);
+                } else {
+                    container.innerHTML = '<p>Select a course to view and manage sessions.</p>';
+                }
+            });
+        } else {
+            container.innerHTML = '<p>No assigned courses found.</p>';
+        }
+    } catch (error) {
+        container.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+    }
+}
+
+async function loadSessions(courseId) {
+    const container = document.getElementById('sessionList');
+    if (!container) return;
+    
+    container.innerHTML = '<p class="loading">Loading sessions...</p>';
+    
+    try {
+        const response = await fetch(`get_sessions.php?course_id=${courseId}`);
+        const data = await response.json();
+        
+        if (data.success && data.sessions && data.sessions.length > 0) {
+            const courseSelect = document.getElementById('sessionCourseSelect');
+            const selectedOption = courseSelect.options[courseSelect.selectedIndex];
+            const courseCode = selectedOption.textContent.split(' - ')[0];
+            const courseName = selectedOption.textContent.split(' - ')[1];
+            
+            container.innerHTML = `
+                <div style="margin-bottom: 15px;">
+                    <button class="btn btn-primary" onclick="createSession(${courseId}, '${esc(courseCode)}', '${esc(courseName)}')">
+                        Create New Session
+                    </button>
+                </div>
+                <div id="sessionsListContainer"></div>
+            `;
+            
+            const sessionsContainer = document.getElementById('sessionsListContainer');
+            sessionsContainer.innerHTML = data.sessions.map(session => {
+                const sessionDate = new Date(session.date);
+                const formattedDate = sessionDate.toLocaleDateString('en-US', { 
+                    weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' 
+                });
+                
+                const codeDisplay = session.attendance_code 
+                    ? `<div style="margin-top: 10px;">
+                         <strong>Attendance Code:</strong> 
+                         <code style="font-size: 16px; padding: 5px 10px; background: #f4f4f4; border-radius: 5px;">${session.attendance_code}</code>
+                       </div>`
+                    : '';
+                
+                return `
+                    <div class="course-item">
+                        <h4>${formattedDate} - ${session.start_time} to ${session.end_time}</h4>
+                        ${session.topic ? `<p><strong>Topic:</strong> ${esc(session.topic)}</p>` : ''}
+                        ${session.location ? `<p><strong>Location:</strong> ${esc(session.location)}</p>` : ''}
+                        <div class="course-meta">
+                            <small><strong>Course:</strong> ${esc(session.course_code)} - ${esc(session.course_name)}</small>
+                            <small><strong>Attendance Count:</strong> ${session.attendance_count || 0}</small>
+                        </div>
+                        ${codeDisplay}
+                        <div style="margin-top: 10px;">
+                            <button class="btn btn-sm btn-primary mark-attendance-btn" 
+                                    data-session-id="${session.session_id}" 
+                                    data-course-id="${session.course_id}">
+                                Mark Attendance
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            // Attach event listeners
+            document.querySelectorAll('.mark-attendance-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const sessionId = this.getAttribute('data-session-id');
+                    const courseId = this.getAttribute('data-course-id');
+                    if (typeof openMarkAttendanceModal === 'function') {
+                        openMarkAttendanceModal(sessionId, courseId);
+                    }
+                });
+            });
+        } else {
+            const courseSelect = document.getElementById('sessionCourseSelect');
+            const selectedOption = courseSelect.options[courseSelect.selectedIndex];
+            const courseCode = selectedOption.textContent.split(' - ')[0];
+            const courseName = selectedOption.textContent.split(' - ')[1];
+            
+            container.innerHTML = `
+                <div style="margin-bottom: 15px;">
+                    <button class="btn btn-primary" onclick="createSession(${courseId}, '${esc(courseCode)}', '${esc(courseName)}')">
+                        Create New Session
+                    </button>
+                </div>
+                <p>No sessions created yet. Create your first session!</p>
+            `;
+        }
+    } catch (error) {
+        container.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+    }
 }
 
 function loadReports() {

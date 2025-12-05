@@ -2,7 +2,7 @@
 
 console.log('=== Student Dashboard Script Loaded ===');
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     console.log('=== DOM Loaded ===');
     setupNavigation();
     loadEnrolledCourses();
@@ -12,25 +12,25 @@ document.addEventListener('DOMContentLoaded', function() {
 function setupNavigation() {
     const navLinks = document.querySelectorAll('.nav-link');
     const sections = document.querySelectorAll('.dashboard-section');
-    
+
     console.log('Navigation setup - Links:', navLinks.length, 'Sections:', sections.length);
-    
+
     navLinks.forEach(link => {
-        link.addEventListener('click', function() {
+        link.addEventListener('click', function () {
             const sectionName = this.dataset.section;
             console.log('>>> Navigate to:', sectionName);
-            
+
             navLinks.forEach(l => l.classList.remove('active'));
             this.classList.add('active');
-            
+
             sections.forEach(s => s.classList.remove('active'));
             const targetSection = document.getElementById(`${sectionName}-section`);
             if (targetSection) {
                 targetSection.classList.add('active');
                 console.log('Showing section:', targetSection.id);
             }
-            
-            switch(sectionName) {
+
+            switch (sectionName) {
                 case 'courses': loadEnrolledCourses(); break;
                 case 'available': loadAvailableCourses(); break;
                 case 'pending': loadPendingRequests(); break;
@@ -48,22 +48,22 @@ async function loadEnrolledCourses() {
         console.error('ERROR: enrolledCourses container not found!');
         return;
     }
-    
+
     container.innerHTML = '<p class="loading">Loading courses...</p>';
-    
+
     try {
         const url = 'get_courses.php?type=enrolled';
         console.log('Fetching:', url);
-        
+
         const response = await fetch(url);
         console.log('Response status:', response.status, response.statusText);
-        
+
         const text = await response.text();
         console.log('Response text (first 300 chars):', text.substring(0, 300));
-        
+
         const data = JSON.parse(text);
         console.log('Parsed data:', data);
-        
+
         if (data.success && data.courses && data.courses.length > 0) {
             console.log(`SUCCESS: Found ${data.courses.length} enrolled courses`);
             container.innerHTML = data.courses.map(course => {
@@ -72,19 +72,19 @@ async function loadEnrolledCourses() {
                 if (course.faculty_first_name && course.faculty_last_name) {
                     instructorInfo = `<small><strong>Instructor:</strong> ${esc(course.faculty_first_name)} ${esc(course.faculty_last_name)}</small>`;
                 }
-                
+
                 // Build intern info
                 let internInfo = '';
                 if (course.intern_first_name && course.intern_last_name) {
                     internInfo = `<small><strong>Faculty Intern:</strong> ${esc(course.intern_first_name)} ${esc(course.intern_last_name)}</small>`;
                 }
-                
+
                 // Build credit hours
                 let creditInfo = '';
                 if (course.credit_hours) {
                     creditInfo = `<small><strong>Credits:</strong> ${course.credit_hours}</small>`;
                 }
-                
+
                 return `
                     <div class="course-item">
                         <h4>${esc(course.course_code)} - ${esc(course.course_name)}</h4>
@@ -115,50 +115,50 @@ async function loadAvailableCourses() {
         console.error('ERROR: availableCourses container not found!');
         return;
     }
-    
+
     container.innerHTML = '<p class="loading">Loading courses...</p>';
-    
+
     try {
         const url = 'get_courses.php?type=available';
         console.log('Fetching:', url);
-        
+
         const response = await fetch(url);
         console.log('Response status:', response.status);
-        
+
         const text = await response.text();
         console.log('Response text (first 300 chars):', text.substring(0, 300));
-        
+
         const data = JSON.parse(text);
         console.log('Parsed data:', data);
         console.log('Number of courses:', data.courses ? data.courses.length : 0);
-        
+
         if (data.success && data.courses && data.courses.length > 0) {
             console.log(`SUCCESS: Found ${data.courses.length} available courses`);
-            
+
             // Log each course ID
             data.courses.forEach((course, index) => {
                 console.log(`Course ${index}: ID=${course.course_id}, Code=${course.course_code}`);
             });
-            
+
             container.innerHTML = data.courses.map(course => {
                 // Build instructor info
                 let instructorInfo = '';
                 if (course.faculty_first_name && course.faculty_last_name) {
                     instructorInfo = `<small><strong>Instructor:</strong> ${esc(course.faculty_first_name)} ${esc(course.faculty_last_name)}</small>`;
                 }
-                
+
                 // Build intern info
                 let internInfo = '';
                 if (course.intern_first_name && course.intern_last_name) {
                     internInfo = `<small><strong>Faculty Intern:</strong> ${esc(course.intern_first_name)} ${esc(course.intern_last_name)}</small>`;
                 }
-                
+
                 // Build credit hours
                 let creditInfo = '';
                 if (course.credit_hours) {
                     creditInfo = `<small><strong>Credits:</strong> ${course.credit_hours}</small>`;
                 }
-                
+
                 return `
                     <div class="course-item">
                         <h4>${esc(course.course_code)} - ${esc(course.course_name)}</h4>
@@ -177,26 +177,26 @@ async function loadAvailableCourses() {
                     </div>
                 `;
             }).join('');
-            
+
             // Attach event listeners
             const buttons = document.querySelectorAll('.join-course-btn');
             console.log('Attaching listeners to', buttons.length, 'buttons');
-            
+
             buttons.forEach((btn, index) => {
                 const courseId = btn.getAttribute('data-course-id');
                 console.log(`Button ${index}: Course ID = ${courseId}`);
-                
-                btn.addEventListener('click', function(e) {
+
+                btn.addEventListener('click', function (e) {
                     e.preventDefault();
                     const cId = this.getAttribute('data-course-id');
                     const cCode = this.getAttribute('data-course-code');
                     const cName = this.getAttribute('data-course-name');
-                    
+
                     console.log('>>> Join button clicked!');
                     console.log('  Course ID:', cId);
                     console.log('  Course Code:', cCode);
                     console.log('  Course Name:', cName);
-                    
+
                     openJoinModal(cId, cCode, cName);
                 });
             });
@@ -215,20 +215,20 @@ async function loadPendingRequests() {
     console.log('>>> loadPendingRequests() called');
     const container = document.getElementById('pendingRequests');
     if (!container) return;
-    
+
     container.innerHTML = '<p class="loading">Loading...</p>';
-    
+
     try {
         const url = 'get_courses.php?type=pending';
         console.log('Fetching:', url);
-        
+
         const response = await fetch(url);
         const text = await response.text();
         console.log('Pending response:', text.substring(0, 200));
-        
+
         const data = JSON.parse(text);
         console.log('Pending data:', data);
-        
+
         if (data.success && data.courses && data.courses.length > 0) {
             console.log(`Found ${data.courses.length} pending requests`);
             container.innerHTML = data.courses.map(course => {
@@ -237,19 +237,19 @@ async function loadPendingRequests() {
                 if (course.faculty_first_name && course.faculty_last_name) {
                     instructorInfo = `<small><strong>Instructor:</strong> ${esc(course.faculty_first_name)} ${esc(course.faculty_last_name)}</small>`;
                 }
-                
+
                 // Build intern info
                 let internInfo = '';
                 if (course.intern_first_name && course.intern_last_name) {
                     internInfo = `<small><strong>Faculty Intern:</strong> ${esc(course.intern_first_name)} ${esc(course.intern_last_name)}</small>`;
                 }
-                
+
                 // Get enrollment type badge
                 let typeBadge = '';
                 if (course.enrollment_type) {
                     typeBadge = `<span class="badge badge-${course.enrollment_type}">${course.enrollment_type}</span>`;
                 }
-                
+
                 return `
                     <div class="course-item pending">
                         <h4>${esc(course.course_code)} - ${esc(course.course_name)}</h4>
@@ -276,7 +276,16 @@ async function loadPendingRequests() {
 
 function loadSchedule() {
     console.log('>>> loadSchedule() called');
-    document.getElementById('sessionSchedule').innerHTML = '<p>Session schedule coming soon...</p>';
+    // This is now handled by the attendance check-in section
+    const container = document.getElementById('checkInSection');
+    if (container) {
+        container.innerHTML = `
+            <p>Use the attendance code provided by your instructor to check in for a session.</p>
+            <button class="btn btn-primary" onclick="checkInWithCode()" style="margin-top: 15px;">
+                Check In with Code
+            </button>
+        `;
+    }
 }
 
 function loadGrades() {
@@ -290,27 +299,27 @@ function setupJoinModal() {
     const modal = document.getElementById('joinCourseModal');
     const closeBtn = modal.querySelector('.close');
     const form = document.getElementById('joinCourseForm');
-    
+
     console.log('Modal elements:', {
         modal: !!modal,
         closeBtn: !!closeBtn,
         form: !!form
     });
-    
+
     if (closeBtn) {
         closeBtn.onclick = () => {
             console.log('Close button clicked');
             modal.style.display = 'none';
         };
     }
-    
+
     window.onclick = (e) => {
         if (e.target === modal) {
             console.log('Clicked outside modal');
             modal.style.display = 'none';
         }
     };
-    
+
     if (form) {
         form.onsubmit = handleJoinSubmit;
         console.log('Form submit handler attached');
@@ -324,28 +333,28 @@ function openJoinModal(courseId, courseCode, courseName) {
     console.log('    courseId:', courseId, 'Type:', typeof courseId);
     console.log('    courseCode:', courseCode);
     console.log('    courseName:', courseName);
-    
+
     const modal = document.getElementById('joinCourseModal');
     const hiddenInput = document.getElementById('selected_course_id');
     const courseInfo = document.getElementById('courseInfo');
-    
+
     console.log('  Modal elements found:', {
         modal: !!modal,
         hiddenInput: !!hiddenInput,
         courseInfo: !!courseInfo
     });
-    
+
     if (!hiddenInput) {
         console.error('CRITICAL ERROR: Hidden input field not found!');
         alert('Error: Form field missing. Please refresh the page.');
         return;
     }
-    
+
     // Set hidden input value
     hiddenInput.value = courseId;
     console.log('  Hidden input value SET TO:', hiddenInput.value);
     console.log('  Verifying: hiddenInput.value =', hiddenInput.value);
-    
+
     // Update course info
     if (courseInfo) {
         courseInfo.innerHTML = `
@@ -355,7 +364,7 @@ function openJoinModal(courseId, courseCode, courseName) {
             </div>
         `;
     }
-    
+
     // Show modal
     modal.style.display = 'block';
     console.log('  Modal displayed');
@@ -366,21 +375,21 @@ async function handleJoinSubmit(e) {
     e.preventDefault();
     console.log('==========================================================');
     console.log('>>> handleJoinSubmit() called - FORM SUBMITTED');
-    
+
     const hiddenInput = document.getElementById('selected_course_id');
     const courseId = hiddenInput ? hiddenInput.value : null;
-    
+
     console.log('  Hidden input element:', hiddenInput);
     console.log('  Course ID from hidden input:', courseId);
     console.log('  Course ID type:', typeof courseId);
     console.log('  Course ID length:', courseId ? courseId.length : 0);
     console.log('  Course ID is empty?', !courseId || courseId === '');
-    
+
     if (!courseId || courseId === '' || courseId === 'null' || courseId === 'undefined') {
         console.error('CRITICAL ERROR: Course ID is invalid!');
         console.error('  Value:', courseId);
         console.error('  This should NOT happen if button was clicked correctly');
-        
+
         Swal.fire({
             icon: 'error',
             title: 'Error',
@@ -393,7 +402,7 @@ async function handleJoinSubmit(e) {
         });
         return;
     }
-    
+
     const enrollmentType = document.querySelector('input[name="enrollment_type"]:checked');
     if (!enrollmentType) {
         console.error('ERROR: No enrollment type selected');
@@ -405,35 +414,35 @@ async function handleJoinSubmit(e) {
         });
         return;
     }
-    
+
     const enrollmentValue = enrollmentType.value;
     console.log('  Enrollment type:', enrollmentValue);
-    
+
     const requestData = {
         course_id: parseInt(courseId),
         enrollment_type: enrollmentValue
     };
-    
+
     console.log('  Request data to send:', JSON.stringify(requestData, null, 2));
-    
+
     try {
         console.log('  Sending POST request to join_course.php...');
-        
+
         const response = await fetch('join_course.php', {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(requestData)
         });
-        
+
         console.log('  Response received:');
         console.log('    Status:', response.status, response.statusText);
         console.log('    Headers:', response.headers);
-        
+
         const text = await response.text();
         console.log('  Response text:', text);
-        
+
         let data;
         try {
             data = JSON.parse(text);
@@ -444,10 +453,10 @@ async function handleJoinSubmit(e) {
             console.error('  Response was:', text);
             throw new Error('Server returned invalid JSON: ' + text.substring(0, 100));
         }
-        
+
         if (data.success) {
             console.log('  SUCCESS! Request submitted successfully');
-            
+
             await Swal.fire({
                 icon: 'success',
                 title: 'Request Submitted!',
@@ -455,21 +464,21 @@ async function handleJoinSubmit(e) {
                 timer: 2000,
                 showConfirmButton: false
             });
-            
+
             // Close modal
             document.getElementById('joinCourseModal').style.display = 'none';
-            
+
             // Clear hidden input
             hiddenInput.value = '';
-            
+
             // Reload data
             console.log('  Reloading available courses and pending requests...');
             await loadAvailableCourses();
             await loadPendingRequests();
-            
+
         } else {
             console.error('  FAILED:', data.message);
-            
+
             Swal.fire({
                 icon: 'error',
                 title: 'Failed',
@@ -482,7 +491,7 @@ async function handleJoinSubmit(e) {
         console.error('Error:', error);
         console.error('Error message:', error.message);
         console.error('Error stack:', error.stack);
-        
+
         Swal.fire({
             icon: 'error',
             title: 'Error',
@@ -493,7 +502,7 @@ async function handleJoinSubmit(e) {
             confirmButtonColor: '#722f37'
         });
     }
-    
+
     console.log('==========================================================');
 }
 

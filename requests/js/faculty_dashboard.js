@@ -2,7 +2,7 @@
 
 console.log('Faculty dashboard script loaded');
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     console.log('Initializing Faculty Dashboard');
     setupNavigation();
     loadMyCourses();
@@ -13,23 +13,23 @@ document.addEventListener('DOMContentLoaded', function() {
 function setupNavigation() {
     const navLinks = document.querySelectorAll('.nav-link');
     const sections = document.querySelectorAll('.dashboard-section');
-    
+
     navLinks.forEach(link => {
-        link.addEventListener('click', function() {
+        link.addEventListener('click', function () {
             const sectionName = this.dataset.section;
             console.log('Navigating to:', sectionName);
-            
+
             navLinks.forEach(l => l.classList.remove('active'));
             this.classList.add('active');
-            
+
             sections.forEach(s => s.classList.remove('active'));
             const targetSection = document.getElementById(`${sectionName}-section`);
             if (targetSection) targetSection.classList.add('active');
-            
-            switch(sectionName) {
+
+            switch (sectionName) {
                 case 'courses': loadMyCourses(); break;
                 case 'enrollment': loadEnrollmentRequests(); break;
-                case 'sessions': loadSessions(); break;
+                case 'sessions': initializeSessions(); break;
                 case 'reports': break;
             }
         });
@@ -41,28 +41,28 @@ function setupModals() {
     const btn = document.getElementById('createCourseBtn');
     const span = modal.querySelector('.close');
     const form = document.getElementById('createCourseForm');
-    
+
     if (btn) btn.onclick = () => modal.style.display = 'block';
     if (span) span.onclick = () => modal.style.display = 'none';
-    
+
     window.onclick = (e) => {
         if (e.target == modal) modal.style.display = 'none';
     };
-    
+
     if (form) form.addEventListener('submit', handleCreateCourse);
 }
 
 async function loadMyCourses() {
     console.log('Loading faculty courses...');
-    
+
     try {
         const response = await fetch('get_courses.php');
         const text = await response.text();
         const data = JSON.parse(text);
         const container = document.getElementById('myCourses');
-        
+
         if (!container) return;
-        
+
         if (data.success && data.courses && data.courses.length > 0) {
             container.innerHTML = data.courses.map(course => {
                 // Build intern display
@@ -72,7 +72,7 @@ async function loadMyCourses() {
                 } else {
                     internInfo = `<small style="color: #999;"><em>No faculty intern assigned yet</em></small>`;
                 }
-                
+
                 return `
                     <div class="course-item">
                         <h4>${esc(course.course_code)} - ${esc(course.course_name)}</h4>
@@ -97,15 +97,15 @@ async function loadMyCourses() {
 
 async function loadEnrollmentRequests() {
     console.log('Loading enrollment requests...');
-    
+
     try {
         const response = await fetch('manage_enrollment.php');
         const text = await response.text();
         const data = JSON.parse(text);
         const container = document.getElementById('enrollmentRequests');
-        
+
         if (!container) return;
-        
+
         if (data.success && data.requests && data.requests.length > 0) {
             container.innerHTML = data.requests.map(request => `
                 <div class="request-item">
@@ -129,15 +129,15 @@ async function loadEnrollmentRequests() {
                     </div>
                 </div>
             `).join('');
-            
+
             document.querySelectorAll('.approve-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
+                btn.addEventListener('click', function () {
                     handleEnrollmentAction(this.getAttribute('data-enrollment-id'), 'approve');
                 });
             });
-            
+
             document.querySelectorAll('.reject-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
+                btn.addEventListener('click', function () {
                     handleEnrollmentAction(this.getAttribute('data-enrollment-id'), 'reject');
                 });
             });
@@ -150,40 +150,157 @@ async function loadEnrollmentRequests() {
     }
 }
 
-function loadSessions() {
+// Initialize sessions section
+async function initializeSessions() {
     const container = document.getElementById('sessionList');
-    if (container) {
-        container.innerHTML = `
-            <p>Session management coming soon. You will be able to:</p>
-            <ul>
-                <li>Create class sessions</li>
-                <li>View session attendance</li>
-                <li>Manage session schedule</li>
-            </ul>
-        `;
+    const courseSelect = document.getElementById('sessionCourseSelect');
+    
+    if (!container) return;
+    
+    // Load courses for dropdown
+    try {
+        const response = await fetch('get_courses.php');
+        const data = await response.json();
+        
+        if (data.success && data.courses && data.courses.length > 0) {
+            courseSelect.innerHTML = '<option value="">Select a course...</option>';
+            data.courses.forEach(course => {
+                const option = document.createElement('option');
+                option.value = course.course_id;
+                option.textContent = `${course.course_code} - ${course.course_name}`;
+                courseSelect.appendChild(option);
+            });
+            
+            courseSelect.addEventListener('change', function() {
+                const courseId = this.value;
+                if (courseId) {
+                    loadSessions(courseId);
+                } else {
+                    container.innerHTML = '<p>Select a course to view and manage sessions.</p>';
+                }
+            });
+        } else {
+            container.innerHTML = '<p>No courses found. Create a course first!</p>';
+        }
+    } catch (error) {
+        container.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+    }
+}
+
+async function loadSessions(courseId) {
+    const container = document.getElementById('sessionList');
+    if (!container) return;
+    
+    container.innerHTML = '<p class="loading">Loading sessions...</p>';
+    
+    try {
+        const response = await fetch(`get_sessions.php?course_id=${courseId}`);
+        const data = await response.json();
+        
+        if (data.success && data.sessions && data.sessions.length > 0) {
+            const courseSelect = document.getElementById('sessionCourseSelect');
+            const selectedOption = courseSelect.options[courseSelect.selectedIndex];
+            const courseCode = selectedOption.textContent.split(' - ')[0];
+            const courseName = selectedOption.textContent.split(' - ')[1];
+            
+            container.innerHTML = `
+                <div style="margin-bottom: 15px;">
+                    <button class="btn btn-primary" onclick="createSession(${courseId}, '${esc(courseCode)}', '${esc(courseName)}')">
+                        Create New Session
+                    </button>
+                </div>
+                <div id="sessionsListContainer"></div>
+            `;
+            
+            // Load sessions using session_management.js function
+            if (typeof loadSessions === 'function' && window.loadSessions !== loadSessions) {
+                // Use the session_management.js version
+                const sessionsContainer = document.getElementById('sessionsListContainer');
+                sessionsContainer.innerHTML = data.sessions.map(session => {
+                    const sessionDate = new Date(session.date);
+                    const formattedDate = sessionDate.toLocaleDateString('en-US', { 
+                        weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' 
+                    });
+                    
+                    const codeDisplay = session.attendance_code 
+                        ? `<div style="margin-top: 10px;">
+                             <strong>Attendance Code:</strong> 
+                             <code style="font-size: 16px; padding: 5px 10px; background: #f4f4f4; border-radius: 5px;">${session.attendance_code}</code>
+                           </div>`
+                        : '';
+                    
+                    return `
+                        <div class="course-item">
+                            <h4>${formattedDate} - ${session.start_time} to ${session.end_time}</h4>
+                            ${session.topic ? `<p><strong>Topic:</strong> ${esc(session.topic)}</p>` : ''}
+                            ${session.location ? `<p><strong>Location:</strong> ${esc(session.location)}</p>` : ''}
+                            <div class="course-meta">
+                                <small><strong>Course:</strong> ${esc(session.course_code)} - ${esc(session.course_name)}</small>
+                                <small><strong>Attendance Count:</strong> ${session.attendance_count || 0}</small>
+                            </div>
+                            ${codeDisplay}
+                            <div style="margin-top: 10px;">
+                                <button class="btn btn-sm btn-primary mark-attendance-btn" 
+                                        data-session-id="${session.session_id}" 
+                                        data-course-id="${session.course_id}">
+                                    Mark Attendance
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                
+                // Attach event listeners
+                document.querySelectorAll('.mark-attendance-btn').forEach(btn => {
+                    btn.addEventListener('click', function() {
+                        const sessionId = this.getAttribute('data-session-id');
+                        const courseId = this.getAttribute('data-course-id');
+                        if (typeof openMarkAttendanceModal === 'function') {
+                            openMarkAttendanceModal(sessionId, courseId);
+                        }
+                    });
+                });
+            }
+        } else {
+            const courseSelect = document.getElementById('sessionCourseSelect');
+            const selectedOption = courseSelect.options[courseSelect.selectedIndex];
+            const courseCode = selectedOption.textContent.split(' - ')[0];
+            const courseName = selectedOption.textContent.split(' - ')[1];
+            
+            container.innerHTML = `
+                <div style="margin-bottom: 15px;">
+                    <button class="btn btn-primary" onclick="createSession(${courseId}, '${esc(courseCode)}', '${esc(courseName)}')">
+                        Create New Session
+                    </button>
+                </div>
+                <p>No sessions created yet. Create your first session!</p>
+            `;
+        }
+    } catch (error) {
+        container.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
     }
 }
 
 async function handleCreateCourse(e) {
     e.preventDefault();
     console.log('Creating course...');
-    
+
     const formData = {
         course_code: document.getElementById('course_code').value.trim(),
         course_name: document.getElementById('course_name').value.trim(),
         description: document.getElementById('description').value.trim(),
         credit_hours: document.getElementById('credit_hours').value
     };
-    
+
     try {
         const response = await fetch('create_course.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(formData)
         });
-        
+
         const data = await response.json();
-        
+
         if (data.success) {
             await Swal.fire({
                 icon: 'success',
@@ -191,7 +308,7 @@ async function handleCreateCourse(e) {
                 text: data.message,
                 timer: 2000
             });
-            
+
             document.getElementById('createCourseModal').style.display = 'none';
             document.getElementById('createCourseForm').reset();
             await loadMyCourses();
@@ -214,7 +331,7 @@ async function handleCreateCourse(e) {
 
 async function handleEnrollmentAction(enrollmentId, action) {
     console.log(`Handling enrollment ${action}...`);
-    
+
     try {
         const result = await Swal.fire({
             title: `${action.charAt(0).toUpperCase() + action.slice(1)} Request?`,
@@ -224,9 +341,9 @@ async function handleEnrollmentAction(enrollmentId, action) {
             confirmButtonColor: action === 'approve' ? '#28a745' : '#dc3545',
             confirmButtonText: `Yes, ${action}`
         });
-        
+
         if (!result.isConfirmed) return;
-        
+
         const response = await fetch('manage_enrollment.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -235,9 +352,9 @@ async function handleEnrollmentAction(enrollmentId, action) {
                 action: action
             })
         });
-        
+
         const data = await response.json();
-        
+
         if (data.success) {
             await Swal.fire({
                 icon: 'success',
@@ -245,7 +362,7 @@ async function handleEnrollmentAction(enrollmentId, action) {
                 text: data.message,
                 timer: 2000
             });
-            
+
             await loadEnrollmentRequests();
             await loadMyCourses();
         } else {
