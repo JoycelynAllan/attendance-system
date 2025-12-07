@@ -16,13 +16,25 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['role'])) {
 require_once 'db_connect.php';
 
 // Log which database we're connected to
+$currentDb = 'unknown';
+$dbConnectionInfo = [];
 try {
     $stmt = $conn->query("SELECT DATABASE() as dbname");
     $dbInfo = $stmt->fetch();
     $currentDb = $dbInfo['dbname'];
-    error_log("get_courses.php - Connected to database: $currentDb");
+    
+    // Get course count for debugging
+    $stmt = $conn->query("SELECT COUNT(*) as count FROM courses");
+    $courseCount = $stmt->fetch()['count'];
+    
+    error_log("get_courses.php - Connected to database: $currentDb (Total courses: $courseCount)");
+    $dbConnectionInfo = [
+        'database' => $currentDb,
+        'total_courses' => $courseCount
+    ];
 } catch(PDOException $e) {
     error_log("get_courses.php - Could not get database name: " . $e->getMessage());
+    $dbConnectionInfo = ['error' => $e->getMessage()];
 }
 
 $user_id = $_SESSION['user_id'];
@@ -174,11 +186,26 @@ try {
     
     error_log("Returning " . count($courses) . " courses");
     
-    echo json_encode([
+    // Include debug info in response if no courses found
+    $response = [
         'success' => true,
         'courses' => $courses,
         'count' => count($courses)
-    ]);
+    ];
+    
+    // Add debug info if no courses found to help diagnose
+    if (count($courses) === 0) {
+        $response['debug'] = [
+            'database' => $currentDb,
+            'user_id' => $user_id,
+            'role' => $role,
+            'type' => $type,
+            'db_info' => $dbConnectionInfo
+        ];
+        error_log("get_courses.php - WARNING: No courses found for user_id=$user_id, role=$role, type=$type, database=$currentDb");
+    }
+    
+    echo json_encode($response);
     
 } catch(PDOException $e) {
     error_log("get_courses.php ERROR: " . $e->getMessage());
