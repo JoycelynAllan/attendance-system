@@ -12,6 +12,16 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'faculty') {
 
 require_once 'db_connect.php';
 
+// Log which database we're connected to
+try {
+    $stmt = $conn->query("SELECT DATABASE() as dbname");
+    $dbInfo = $stmt->fetch();
+    $currentDb = $dbInfo['dbname'];
+    error_log("create_course.php - Connected to database: $currentDb");
+} catch(PDOException $e) {
+    error_log("create_course.php - Could not get database name: " . $e->getMessage());
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     echo json_encode(['success' => false, 'message' => 'Invalid request method']);
     exit;

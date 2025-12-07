@@ -15,6 +15,16 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['role'])) {
 
 require_once 'db_connect.php';
 
+// Log which database we're connected to
+try {
+    $stmt = $conn->query("SELECT DATABASE() as dbname");
+    $dbInfo = $stmt->fetch();
+    $currentDb = $dbInfo['dbname'];
+    error_log("get_courses.php - Connected to database: $currentDb");
+} catch(PDOException $e) {
+    error_log("get_courses.php - Could not get database name: " . $e->getMessage());
+}
+
 $user_id = $_SESSION['user_id'];
 $role = $_SESSION['role'];
 $type = isset($_GET['type']) ? $_GET['type'] : 'all';
