@@ -56,11 +56,26 @@ if (!$isServer && isset($_SERVER['HTTP_HOST'])) {
     $httpHost = $_SERVER['HTTP_HOST'];
     // Remove port number for comparison
     $httpHostClean = preg_replace('/:\d+$/', '', $httpHost);
-    $isServer = (strpos($httpHostClean, '169.239.251.102') !== false || 
-                 strpos($httpHostClean, 'joycelyn.allan') !== false ||
-                 (strpos($httpHostClean, 'localhost') === false && 
-                  strpos($httpHostClean, '127.0.0.1') === false &&
-                  $httpHostClean !== '::1'));
+    
+    // Check for known server IPs/hostnames
+    $knownServerHosts = ['169.239.251.102', 'joycelyn.allan'];
+    $isKnownServer = false;
+    foreach ($knownServerHosts as $knownHost) {
+        if (strpos($httpHostClean, $knownHost) !== false) {
+            $isKnownServer = true;
+            break;
+        }
+    }
+    
+    // If not a known server host, check if it's NOT localhost
+    if (!$isKnownServer) {
+        $isKnownServer = (strpos($httpHostClean, 'localhost') === false && 
+                         strpos($httpHostClean, '127.0.0.1') === false &&
+                         $httpHostClean !== '::1' &&
+                         $httpHostClean !== 'localhost.localdomain');
+    }
+    
+    $isServer = $isKnownServer;
 }
 
 // Check SERVER_NAME as fallback
@@ -68,7 +83,24 @@ if (!$isServer && isset($_SERVER['SERVER_NAME'])) {
     $serverName = $_SERVER['SERVER_NAME'];
     $isServer = ($serverName !== 'localhost' && 
                  $serverName !== '127.0.0.1' && 
-                 $serverName !== '::1');
+                 $serverName !== '::1' &&
+                 $serverName !== 'localhost.localdomain');
+}
+
+// Additional check: If REMOTE_ADDR exists and is not localhost, likely a server
+if (!$isServer && isset($_SERVER['REMOTE_ADDR'])) {
+    $remoteAddr = $_SERVER['REMOTE_ADDR'];
+    if ($remoteAddr !== '127.0.0.1' && 
+        $remoteAddr !== '::1' && 
+        strpos($remoteAddr, '192.168.') !== 0 && 
+        strpos($remoteAddr, '10.') !== 0 &&
+        strpos($remoteAddr, '172.16.') !== 0) {
+        // Not a local/private IP, likely a server
+        // But only if we have server config available
+        if (getenv('DB_HOST_SERVER') !== false) {
+            $isServer = true;
+        }
+    }
 }
 
 // Check if server database credentials are configured
