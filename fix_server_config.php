@@ -76,4 +76,3 @@ echo "1. Refresh your browser and try accessing your dashboard\n";
 echo "2. Visit db_diagnostic.php to verify the connection\n";
 echo "3. If you still don't see data, check that your data is in the 'webtech_2025A_joycelyn_allan' database\n";
 ?>
-
