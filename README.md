@@ -109,7 +109,7 @@ chmod 755 -R /path/to/attendance-system
 
 Open your browser and navigate to:
 - **Local**: `http://localhost/attendance%20system/`
-- **Server**: `http://your-server-ip/path/to/attendance-system/`
+- **Server**: `http://169.239.251.102:341/attendance-system/`
 
 ## ⚙️ Configuration
 

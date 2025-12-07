@@ -41,12 +41,70 @@ function loadEnv($path) {
 // Load .env file
 loadEnv(__DIR__ . '/.env');
 
+// Detect if running on server
+// Check by hostname/IP, HTTP_HOST, or APP_ENV
+$isServer = false;
+
+// Check APP_ENV first (most reliable way to force server mode)
+$appEnv = getenv('APP_ENV');
+if ($appEnv === 'production' || $appEnv === 'server') {
+    $isServer = true;
+}
+
+// Check HTTP_HOST (most reliable for web requests)
+if (!$isServer && isset($_SERVER['HTTP_HOST'])) {
+    $httpHost = $_SERVER['HTTP_HOST'];
+    // Remove port number for comparison
+    $httpHostClean = preg_replace('/:\d+$/', '', $httpHost);
+    $isServer = (strpos($httpHostClean, '169.239.251.102') !== false || 
+                 strpos($httpHostClean, 'joycelyn.allan') !== false ||
+                 (strpos($httpHostClean, 'localhost') === false && 
+                  strpos($httpHostClean, '127.0.0.1') === false &&
+                  $httpHostClean !== '::1'));
+}
+
+// Check SERVER_NAME as fallback
+if (!$isServer && isset($_SERVER['SERVER_NAME'])) {
+    $serverName = $_SERVER['SERVER_NAME'];
+    $isServer = ($serverName !== 'localhost' && 
+                 $serverName !== '127.0.0.1' && 
+                 $serverName !== '::1');
+}
+
+// Check if server database credentials are configured
+$hasServerConfig = false;
+$dbHostServer = getenv('DB_HOST_SERVER');
+if ($dbHostServer !== false && $dbHostServer !== '') {
+    $hasServerConfig = true;
+}
+
 // Database configuration with support for remote servers
-$host = getenv('DB_HOST') ?: 'localhost';
-$port = getenv('DB_PORT') ?: '3306';
-$dbname = getenv('DB_NAME') ?: 'attendancemanagement';
-$username = getenv('DB_USER') ?: 'root';
-$password = getenv('DB_PASS');
+if ($isServer && $hasServerConfig) {
+    // Use server credentials
+    $host = getenv('DB_HOST_SERVER') ?: 'localhost';
+    $port = getenv('DB_PORT_SERVER') ?: '3306';
+    $dbname = getenv('DB_NAME_SERVER') ?: 'webtech_2025A_joycelyn_allan';
+    $username = getenv('DB_USER_SERVER') ?: 'root';
+    $password = getenv('DB_PASS_SERVER') ?: '';
+    
+    // Log which config is being used (for debugging)
+    error_log("Using SERVER database config: $host:$port/$dbname");
+} else {
+    // Use localhost credentials
+    $host = getenv('DB_HOST') ?: 'localhost';
+    $port = getenv('DB_PORT') ?: '3306';
+    $dbname = getenv('DB_NAME') ?: 'attendancemanagement';
+    $username = getenv('DB_USER') ?: 'root';
+    $password = getenv('DB_PASS');
+    
+    // Log which config is being used (for debugging)
+    if ($isServer && !$hasServerConfig) {
+        error_log("WARNING: Server detected but DB_HOST_SERVER not configured. Using localhost config.");
+    } else {
+        error_log("Using LOCALHOST database config: $host:$port/$dbname");
+    }
+}
+
 // Handle empty password - if DB_PASS is not set or is empty string, use empty password
 if ($password === false || $password === '') {
     $password = '';

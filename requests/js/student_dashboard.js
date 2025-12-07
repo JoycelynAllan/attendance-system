@@ -490,8 +490,6 @@ async function handleJoinSubmit(e) {
             await loadPendingRequests();
             // Also refresh enrolled courses in case this was just approved
             setTimeout(() => loadEnrolledCourses(), 500);
-            // Also refresh enrolled courses in case this was just approved
-            setTimeout(() => loadEnrolledCourses(), 500);
 
         } else {
             console.error('  FAILED:', data.message);
