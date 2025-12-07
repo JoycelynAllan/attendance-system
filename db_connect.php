@@ -70,7 +70,7 @@ if (!$isServer && isset($_SERVER['HTTP_HOST'])) {
     // If not a known server host, check if it's NOT localhost
     if (!$isKnownServer) {
         $isKnownServer = (strpos($httpHostClean, 'localhost') === false && 
-                         strpos($httpHostClean, '127.0.0.1') === false &&
+                  strpos($httpHostClean, '127.0.0.1') === false &&
                          $httpHostClean !== '::1' &&
                          $httpHostClean !== 'localhost.localdomain');
     }
@@ -108,6 +108,37 @@ $hasServerConfig = false;
 $dbHostServer = getenv('DB_HOST_SERVER');
 if ($dbHostServer !== false && $dbHostServer !== '') {
     $hasServerConfig = true;
+}
+
+// Additional check: If server config exists and we're not clearly on localhost, prefer server config
+// This makes detection more reliable when HTTP_HOST detection might fail
+if ($hasServerConfig && !$isServer) {
+    $isDefinitelyLocalhost = false;
+    
+    // Check if we're definitely on localhost
+    if (isset($_SERVER['HTTP_HOST'])) {
+        $httpHost = strtolower($_SERVER['HTTP_HOST']);
+        $isDefinitelyLocalhost = (
+            strpos($httpHost, 'localhost') !== false || 
+            strpos($httpHost, '127.0.0.1') !== false ||
+            $httpHost === '::1'
+        );
+    }
+    
+    if (isset($_SERVER['SERVER_NAME'])) {
+        $serverName = strtolower($_SERVER['SERVER_NAME']);
+        $isDefinitelyLocalhost = $isDefinitelyLocalhost || (
+            $serverName === 'localhost' || 
+            $serverName === '127.0.0.1' ||
+            $serverName === '::1'
+        );
+    }
+    
+    // If we have server config and we're NOT definitely on localhost, use server config
+    if (!$isDefinitelyLocalhost) {
+        $isServer = true;
+        error_log("Using server config because DB_HOST_SERVER is configured and not on localhost");
+    }
 }
 
 // Database configuration with support for remote servers
